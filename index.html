@@ -30,7 +30,7 @@
   .app{display:flex;flex-direction:column;min-height:100vh;}
 
   .topbar{
-    display:flex;align-items:baseline;gap:14px;
+    display:flex;align-items:center;gap:14px;
     padding:18px 26px;border-bottom:1px solid var(--panel-border);
     background:linear-gradient(180deg,#132635,#0D1B26);
   }
@@ -116,9 +116,10 @@
 
   /* ---- right: control pane ---- */
   .control-pane{
-    flex:0 0 328px;max-width:328px;min-width:280px;
+    flex:0 0 328px;max-width:328px;min-width:240px;
     border-left:1px solid var(--panel-border);background:var(--panel-bg);
     overflow-y:auto;max-height:calc(100vh - 68px);
+    display:flex;flex-direction:column;
   }
   .cp-section{border-bottom:1px solid var(--panel-border);}
   .cp-section summary{
@@ -135,7 +136,6 @@
   .field{display:flex;flex-direction:column;gap:5px;}
   .field label{font-size:11px;color:var(--ink-muted);letter-spacing:.3px;text-transform:uppercase;}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
-  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}
 
   input[type=text],input[type=number],select{
     font-family:var(--font-mono);font-size:12.5px;color:var(--ink-light);
@@ -156,9 +156,6 @@
   .size-row{display:flex;align-items:center;gap:8px;}
   .size-row span{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-muted);width:22px;text-align:right;}
 
-  .series-row-controls{display:flex;gap:8px;align-items:center;}
-  .series-row-controls select{flex:1;}
-
   table.pts{width:100%;border-collapse:collapse;font-size:11.5px;}
   table.pts th{
     text-align:left;font-weight:500;color:var(--ink-muted);font-size:10.5px;
@@ -171,6 +168,18 @@
   .del-pt:hover{color:#F0A9A4;}
   .empty-note{font-size:11.5px;color:var(--ink-muted);font-style:italic;padding:6px 2px;}
 
+  .cp-footer{
+    margin-top:auto;flex:1;min-height:40px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:16px 18px;color:var(--ink-muted);font-size:11px;letter-spacing:.3px;
+    border-top:1px solid var(--panel-border);
+  }
+  .cp-footer-mark{
+    width:16px;height:16px;border:1px solid var(--brass);border-radius:3px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:9px;color:var(--brass);flex:none;
+  }
+
   ::-webkit-scrollbar{width:9px;}
   ::-webkit-scrollbar-track{background:var(--panel-bg);}
   ::-webkit-scrollbar-thumb{background:var(--panel-border);border-radius:5px;}
@@ -179,7 +188,19 @@
     .control-pane{flex:1 1 100%;max-width:100%;border-left:none;border-top:1px solid var(--panel-border);max-height:none;}
     .canvas-pane{padding:16px;}
     .plot-shell{min-height:340px;}
+    .resizer{display:none;}
   }
+
+  .resizer{
+    flex:none;width:6px;cursor:col-resize;background:var(--panel-border);
+    position:relative;transition:background .1s;
+  }
+  .resizer:hover, .resizer.active{background:var(--brass);}
+  .resizer::after{
+    content:'';position:absolute;top:50%;left:50%;width:2px;height:28px;
+    transform:translate(-50%,-50%);background:var(--ink-muted);border-radius:2px;
+  }
+  .resizer:hover::after, .resizer.active::after{background:#241A08;}
 
   .modal-overlay{
     display:none;position:fixed;inset:0;background:rgba(6,13,19,.72);
@@ -224,7 +245,7 @@
       <div class="toolbar">
         <div class="chips" id="chips"></div>
         <button class="brass" id="addSeriesBtn">+ Add series</button>
-        <button class="ghost icon-only" id="undoBtn" title="Undo last change (add, move, edit or delete)" disabled>↶</button>
+        <button class="ghost icon-only" id="undoBtn" title="Undo last change (add, move, edit or delete)" aria-label="Undo last change" disabled>↶</button>
         <button class="danger-outline" id="clearBtn">Clear points</button>
         <div class="dl-dropdown" id="dlDropdown">
           <button class="brass" id="downloadBtn">⬇ Download <span class="caret">▾</span></button>
@@ -244,10 +265,12 @@
       <div class="hint">click the sheet to drop a point on the active series · drag a point to move it · double‑click a point to delete it</div>
     </section>
 
+    <div class="resizer" id="resizer" title="Drag to resize"></div>
+
     <aside class="control-pane">
 
       <details class="cp-section" open>
-        <summary>Title &amp; labels<span></span></summary>
+        <summary>Title &amp; labels</summary>
         <div class="cp-body">
           <div class="field"><label>Chart title</label><input type="text" id="titleInput" placeholder="e.g. ECDF of average energy consumption"></div>
           <div class="row2">
@@ -294,6 +317,7 @@
       <details class="cp-section" open>
         <summary>Active series</summary>
         <div class="cp-body">
+          <div class="field"><label>Select series</label><select id="activeSeriesSelect"></select></div>
           <div class="field"><label>Name</label><input type="text" id="seriesName"></div>
           <div class="row2">
             <div class="field"><label>Color</label><input type="color" id="seriesColor"></div>
@@ -326,7 +350,6 @@
               </select>
             </div>
           </div>
-          <button class="danger-outline" id="removeSeriesBtn" style="display:none;">Remove this series</button>
 
           <div class="field" style="margin-top:4px;">
             <label>Points</label>
@@ -349,6 +372,11 @@
           </div>
         </div>
       </details>
+
+      <div class="cp-footer">
+        <span class="cp-footer-mark">P</span>
+        <span>Plotcraft — click-plot figure builder</span>
+      </div>
 
     </aside>
   </div>
@@ -486,8 +514,10 @@
     plotRect = {left:plotLeft, top:plotTop, width:plotW, height:plotH,
       xMin:state.xMin, xMax:state.xMax, yMin:state.yMin, yMax:state.yMax};
 
-    function X(x){ return plotLeft + (x-state.xMin)/(state.xMax-state.xMin)*plotW; }
-    function Y(y){ return plotTop + (1-(y-state.yMin)/(state.yMax-state.yMin))*plotH; }
+    const xSpan = (state.xMax - state.xMin) || 1;
+    const ySpan = (state.yMax - state.yMin) || 1;
+    function X(x){ return plotLeft + (x-state.xMin)/xSpan*plotW; }
+    function Y(y){ return plotTop + (1-(y-state.yMin)/ySpan)*plotH; }
 
     // background sheet
     svg.appendChild(el('rect',{x:0,y:0,width:W,height:H,fill:'#ffffff'}));
@@ -757,15 +787,20 @@
   function renderChips(){
     const wrap = document.getElementById('chips');
     wrap.innerHTML = '';
+    const onlyOne = state.series.length<=1;
     state.series.forEach(s=>{
       const c = document.createElement('div');
       c.className = 'chip'+(s.id===state.activeId?' active':'');
-      c.innerHTML = `<span class="dot" style="background:${s.color}"></span><span class="name">${escapeHtml(s.name)}</span><span class="chip-x" title="Remove series">&times;</span>`;
+      const xHtml = onlyOne ? '' : `<span class="chip-x" role="button" tabindex="0" aria-label="Remove ${escapeHtml(s.name)}" title="Remove series">&times;</span>`;
+      c.innerHTML = `<span class="dot" style="background:${s.color}"></span><span class="name">${escapeHtml(s.name)}</span>${xHtml}`;
       c.addEventListener('click', ()=>{ state.activeId = s.id; render(); });
-      c.querySelector('.chip-x').addEventListener('click', (e)=>{
-        e.stopPropagation();
-        removeSeries(s.id);
-      });
+      const xEl = c.querySelector('.chip-x');
+      if(xEl){
+        xEl.addEventListener('click', (e)=>{ e.stopPropagation(); removeSeries(s.id); });
+        xEl.addEventListener('keydown', (e)=>{
+          if(e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); removeSeries(s.id); }
+        });
+      }
       wrap.appendChild(c);
     });
   }
@@ -776,12 +811,20 @@
   function renderSeriesForm(){
     const s = activeSeries();
     if(!s) return;
+    const sel = document.getElementById('activeSeriesSelect');
+    sel.innerHTML = '';
+    state.series.forEach(sr=>{
+      const opt = document.createElement('option');
+      opt.value = sr.id;
+      opt.textContent = sr.name;
+      sel.appendChild(opt);
+    });
+    sel.value = s.id;
     document.getElementById('seriesName').value = s.name;
     document.getElementById('seriesColor').value = s.color;
     document.getElementById('seriesMarker').value = s.marker;
     document.getElementById('seriesLineStyle').value = s.lineStyle;
     document.getElementById('seriesCurve').value = s.curve;
-    document.getElementById('removeSeriesBtn').disabled = state.series.length<=1;
   }
 
   function renderPointsTable(){
@@ -843,6 +886,7 @@
   document.getElementById('legendToggle').addEventListener('change', e=>{ state.showLegend=e.target.checked; render(); });
   document.getElementById('legendPos').addEventListener('change', e=>{ state.legendPos=e.target.value; render(); });
 
+  document.getElementById('activeSeriesSelect').addEventListener('change', e=>{ state.activeId = e.target.value; render(); });
   document.getElementById('seriesName').addEventListener('input', e=>{ activeSeries().name=e.target.value; render(); });
   document.getElementById('seriesColor').addEventListener('input', e=>{ activeSeries().color=e.target.value; render(); });
   document.getElementById('seriesMarker').addEventListener('change', e=>{ activeSeries().marker=e.target.value; render(); });
@@ -852,9 +896,6 @@
   document.getElementById('addSeriesBtn').addEventListener('click', ()=>{
     const s = newSeries('Series '+(state.series.length+1));
     state.series.push(s); state.activeId = s.id; render();
-  });
-  document.getElementById('removeSeriesBtn').addEventListener('click', ()=>{
-    removeSeries(state.activeId);
   });
   function removeSeries(id){
     if(state.series.length<=1) return;
@@ -976,6 +1017,38 @@
   });
   document.addEventListener('keydown', (e)=>{
     if(e.key === 'Escape') howtoOverlay.classList.remove('open');
+  });
+
+  const resizer = document.getElementById('resizer');
+  const controlPane = document.querySelector('.control-pane');
+  const workspaceEl = document.querySelector('.workspace');
+  let resizingPanes = false;
+  resizer.addEventListener('mousedown', (e)=>{
+    resizingPanes = true;
+    resizer.classList.add('active');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e)=>{
+    if(!resizingPanes) return;
+    const rect = workspaceEl.getBoundingClientRect();
+    let newWidth = rect.right - e.clientX;
+    newWidth = Math.min(560, Math.max(240, newWidth));
+    controlPane.style.flex = `0 0 ${newWidth}px`;
+    controlPane.style.maxWidth = newWidth + 'px';
+  });
+  document.addEventListener('mouseup', ()=>{
+    if(resizingPanes){
+      resizingPanes = false;
+      resizer.classList.remove('active');
+      document.body.style.userSelect = '';
+    }
+  });
+  window.addEventListener('resize', ()=>{
+    if(window.innerWidth <= 880){
+      controlPane.style.flex = '';
+      controlPane.style.maxWidth = '';
+    }
   });
 
   render();
