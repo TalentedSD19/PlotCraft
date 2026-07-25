@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Plotcraft</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --app-bg:#0D1B26;
+    --panel-bg:#152A3B;
+    --panel-bg-2:#1B3448;
+    --panel-border:#2B4B63;
+    --ink-light:#DCE7EE;
+    --ink-muted:#7E97A8;
+    --brass:#C9973F;
+    --brass-dark:#A87A2C;
+    --danger:#D1574F;
+    --paper:#FFFFFF;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-ui:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--app-bg);color:var(--ink-light);font-family:var(--font-ui);}
+  body{min-height:100vh;}
+
+  .app{display:flex;flex-direction:column;min-height:100vh;}
+
+  .topbar{
+    display:flex;align-items:baseline;gap:14px;
+    padding:18px 26px;border-bottom:1px solid var(--panel-border);
+    background:linear-gradient(180deg,#132635,#0D1B26);
+  }
+  .topbar .mark{
+    width:30px;height:30px;border:1.5px solid var(--brass);border-radius:3px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:13px;color:var(--brass);flex:none;
+  }
+  .topbar h1{font-family:var(--font-display);font-weight:600;font-size:19px;margin:0;color:#F1F5F8;letter-spacing:.2px;}
+  .topbar .sub{font-family:var(--font-mono);font-size:12px;color:var(--ink-muted);}
+
+  .workspace{display:flex;flex:1;min-height:0;flex-wrap:wrap;}
+
+  /* ---- left: canvas pane ---- */
+  .canvas-pane{flex:1 1 620px;display:flex;flex-direction:column;min-width:0;padding:20px 16px 26px 26px;}
+
+  .toolbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-bottom:14px;padding:10px 12px;
+    background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:6px;
+  }
+  .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:120px;}
+  .chip{
+    display:flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:20px;
+    background:var(--panel-bg-2);border:1px solid var(--panel-border);cursor:pointer;
+    font-size:12.5px;color:var(--ink-light);
+  }
+  .chip .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .chip.active{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass) inset;}
+  .chip .name{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .chip .chip-x{
+    color:var(--ink-muted);font-size:14px;line-height:1;padding:0 2px;border-radius:50%;
+  }
+  .chip .chip-x:hover{color:var(--danger);}
+
+  button{
+    font-family:var(--font-ui);font-size:12.5px;cursor:pointer;
+    background:var(--panel-bg-2);color:var(--ink-light);
+    border:1px solid var(--panel-border);border-radius:5px;padding:7px 11px;
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+  button:hover{border-color:var(--ink-muted);}
+  button:active{transform:scale(.98);}
+  button.brass{background:var(--brass);border-color:var(--brass-dark);color:#241A08;font-weight:600;}
+  button.brass:hover{background:#D8A550;}
+  button.ghost{background:transparent;}
+  button.danger-outline{border-color:var(--danger);color:#F0A9A4;background:transparent;}
+  button.icon-only{padding:7px 9px;}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+
+  .dl-dropdown{position:relative;}
+  .dl-dropdown .caret{font-size:10px;}
+  .dl-menu{
+    display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:20;
+    background:var(--panel-bg-2);border:1px solid var(--panel-border);border-radius:6px;
+    padding:5px;min-width:160px;box-shadow:0 10px 24px -8px rgba(0,0,0,.6);
+  }
+  .dl-menu.open{display:flex;flex-direction:column;gap:2px;}
+  .dl-menu button{
+    background:transparent;border:none;text-align:left;padding:8px 10px;border-radius:4px;width:100%;
+  }
+  .dl-menu button:hover{background:var(--panel-border);}
+
+  .plot-shell{
+    position:relative;flex:1;min-height:420px;
+    background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;padding:22px;
+  }
+  .plot-sheet{
+    background:var(--paper);width:100%;height:100%;border-radius:2px;
+    box-shadow:0 12px 30px -10px rgba(0,0,0,.55);position:relative;
+  }
+  svg#plot{width:100%;height:100%;display:block;cursor:crosshair;}
+
+  .readout{
+    position:absolute;bottom:10px;left:12px;
+    font-family:var(--font-mono);font-size:11.5px;color:var(--ink-muted);
+    pointer-events:none;background:rgba(21,42,59,.85);padding:3px 8px;border-radius:4px;
+  }
+  .hint{
+    font-family:var(--font-mono);font-size:11px;color:var(--ink-muted);margin-top:9px;letter-spacing:.2px;
+  }
+
+  /* ---- right: control pane ---- */
+  .control-pane{
+    flex:0 0 328px;max-width:328px;min-width:280px;
+    border-left:1px solid var(--panel-border);background:var(--panel-bg);
+    overflow-y:auto;max-height:calc(100vh - 68px);
+  }
+  .cp-section{border-bottom:1px solid var(--panel-border);}
+  .cp-section summary{
+    list-style:none;cursor:pointer;padding:13px 18px;
+    font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.3px;
+    color:#F1F5F8;display:flex;align-items:center;justify-content:space-between;
+    text-transform:uppercase;
+  }
+  .cp-section summary::-webkit-details-marker{display:none;}
+  .cp-section summary:after{content:'+';color:var(--brass);font-size:15px;font-weight:400;}
+  .cp-section[open] summary:after{content:'−';}
+  .cp-body{padding:2px 18px 16px 18px;display:flex;flex-direction:column;gap:11px;}
+
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:11px;color:var(--ink-muted);letter-spacing:.3px;text-transform:uppercase;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}
+
+  input[type=text],input[type=number],select{
+    font-family:var(--font-mono);font-size:12.5px;color:var(--ink-light);
+    background:var(--panel-bg-2);border:1px solid var(--panel-border);border-radius:4px;
+    padding:7px 8px;width:100%;
+  }
+  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:var(--brass);}
+  select{font-family:var(--font-ui);}
+  input[type=color]{
+    width:36px;height:30px;padding:2px;border-radius:4px;border:1px solid var(--panel-border);
+    background:var(--panel-bg-2);cursor:pointer;
+  }
+  input[type=range]{width:100%;accent-color:var(--brass);}
+
+  .check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-light);}
+  .check input{accent-color:var(--brass);width:14px;height:14px;}
+
+  .size-row{display:flex;align-items:center;gap:8px;}
+  .size-row span{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-muted);width:22px;text-align:right;}
+
+  .series-row-controls{display:flex;gap:8px;align-items:center;}
+  .series-row-controls select{flex:1;}
+
+  table.pts{width:100%;border-collapse:collapse;font-size:11.5px;}
+  table.pts th{
+    text-align:left;font-weight:500;color:var(--ink-muted);font-size:10.5px;
+    text-transform:uppercase;letter-spacing:.3px;padding:4px 4px;border-bottom:1px solid var(--panel-border);
+  }
+  table.pts td{padding:3px 4px;}
+  table.pts input{padding:4px 5px;font-size:11.5px;}
+  .pts-wrap{max-height:180px;overflow-y:auto;border:1px solid var(--panel-border);border-radius:4px;padding:4px 6px;}
+  .del-pt{background:none;border:none;color:var(--danger);padding:2px 6px;font-size:13px;}
+  .del-pt:hover{color:#F0A9A4;}
+  .empty-note{font-size:11.5px;color:var(--ink-muted);font-style:italic;padding:6px 2px;}
+
+  ::-webkit-scrollbar{width:9px;}
+  ::-webkit-scrollbar-track{background:var(--panel-bg);}
+  ::-webkit-scrollbar-thumb{background:var(--panel-border);border-radius:5px;}
+
+  @media(max-width:880px){
+    .control-pane{flex:1 1 100%;max-width:100%;border-left:none;border-top:1px solid var(--panel-border);max-height:none;}
+    .canvas-pane{padding:16px;}
+    .plot-shell{min-height:340px;}
+  }
+
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(6,13,19,.72);
+    align-items:center;justify-content:center;z-index:100;padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal-card{
+    background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:8px;
+    max-width:560px;width:100%;max-height:82vh;overflow-y:auto;
+    box-shadow:0 24px 60px -12px rgba(0,0,0,.7);
+  }
+  .modal-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;border-bottom:1px solid var(--panel-border);
+    position:sticky;top:0;background:var(--panel-bg);
+  }
+  .modal-head h2{
+    font-family:var(--font-display);font-size:17px;font-weight:600;margin:0;color:#F1F5F8;
+  }
+  .modal-body{padding:16px 20px 22px 20px;display:flex;flex-direction:column;gap:16px;}
+  .modal-step{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;line-height:1.55;color:var(--ink-light);}
+  .modal-step strong{color:#F1F5F8;font-weight:600;}
+  .step-no{
+    flex:none;width:22px;height:22px;border-radius:50%;background:var(--brass);color:#241A08;
+    font-family:var(--font-mono);font-size:12px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="mark">P</div>
+    <h1>Plotcraft</h1>
+    <button class="ghost" id="howtoBtn" style="margin-left:auto;">How to use</button>
+  </div>
+
+  <div class="workspace">
+
+    <section class="canvas-pane">
+      <div class="toolbar">
+        <div class="chips" id="chips"></div>
+        <button class="brass" id="addSeriesBtn">+ Add series</button>
+        <button class="ghost icon-only" id="undoBtn" title="Undo last change (add, move, edit or delete)" disabled>↶</button>
+        <button class="danger-outline" id="clearBtn">Clear points</button>
+        <div class="dl-dropdown" id="dlDropdown">
+          <button class="brass" id="downloadBtn">⬇ Download <span class="caret">▾</span></button>
+          <div class="dl-menu" id="dlMenu">
+            <button type="button" data-fmt="svg">SVG (vector)</button>
+            <button type="button" data-fmt="png">PNG (image)</button>
+            <button type="button" data-fmt="csv">CSV (points)</button>
+          </div>
+        </div>
+      </div>
+      <div class="plot-shell">
+        <div class="plot-sheet">
+          <svg id="plot" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="readout" id="readout">x: —&nbsp;&nbsp;y: —</div>
+        </div>
+      </div>
+      <div class="hint">click the sheet to drop a point on the active series · drag a point to move it · double‑click a point to delete it</div>
+    </section>
+
+    <aside class="control-pane">
+
+      <details class="cp-section" open>
+        <summary>Title &amp; labels<span></span></summary>
+        <div class="cp-body">
+          <div class="field"><label>Chart title</label><input type="text" id="titleInput" placeholder="e.g. ECDF of average energy consumption"></div>
+          <div class="row2">
+            <div class="field"><label>X axis name</label><input type="text" id="xLabelInput" value="X axis"></div>
+            <div class="field"><label>Y axis name</label><input type="text" id="yLabelInput" value="Y axis"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="cp-section" open>
+        <summary>Axis range &amp; ticks</summary>
+        <div class="cp-body">
+          <div class="row2">
+            <div class="field"><label>X min</label><input type="number" id="xMin" value="0" step="any"></div>
+            <div class="field"><label>X max</label><input type="number" id="xMax" value="30" step="any"></div>
+          </div>
+          <div class="field"><label>X tick step</label><input type="number" id="xStep" value="5" step="any" min="0.0001"></div>
+          <div class="row2">
+            <div class="field"><label>Y min</label><input type="number" id="yMin" value="0" step="any"></div>
+            <div class="field"><label>Y max</label><input type="number" id="yMax" value="1" step="any"></div>
+          </div>
+          <div class="field"><label>Y tick step</label><input type="number" id="yStep" value="0.2" step="any" min="0.0001"></div>
+          <label class="check"><input type="checkbox" id="gridToggle" checked> Show gridlines</label>
+        </div>
+      </details>
+
+      <details class="cp-section">
+        <summary>Typography</summary>
+        <div class="cp-body">
+          <div class="field"><label>Plot font family</label>
+            <select id="fontFamily">
+              <option value="serif">Serif (Georgia)</option>
+              <option value="sans">Sans (Helvetica)</option>
+              <option value="mono">Mono (Plex Mono)</option>
+            </select>
+          </div>
+          <div class="field"><label>Title size</label><div class="size-row"><input type="range" id="titleSize" min="10" max="40" value="24"><span id="titleSizeOut">24</span></div></div>
+          <div class="field"><label>Axis label size</label><div class="size-row"><input type="range" id="axisLabelSize" min="8" max="30" value="19"><span id="axisLabelSizeOut">19</span></div></div>
+          <div class="field"><label>Tick label size</label><div class="size-row"><input type="range" id="tickLabelSize" min="7" max="26" value="15"><span id="tickLabelSizeOut">15</span></div></div>
+          <div class="field"><label>Legend size</label><div class="size-row"><input type="range" id="legendSize" min="7" max="26" value="16"><span id="legendSizeOut">16</span></div></div>
+        </div>
+      </details>
+
+      <details class="cp-section" open>
+        <summary>Active series</summary>
+        <div class="cp-body">
+          <div class="field"><label>Name</label><input type="text" id="seriesName"></div>
+          <div class="row2">
+            <div class="field"><label>Color</label><input type="color" id="seriesColor"></div>
+            <div class="field"><label>Marker</label>
+              <select id="seriesMarker">
+                <option value="circle">Circle</option>
+                <option value="square">Square</option>
+                <option value="triangle">Triangle up</option>
+                <option value="triangle-down">Triangle down</option>
+                <option value="diamond">Diamond</option>
+                <option value="star">Star</option>
+                <option value="cross">Cross (x)</option>
+                <option value="plus">Plus (+)</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Line style</label>
+              <select id="seriesLineStyle">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="none">No line</option>
+              </select>
+            </div>
+            <div class="field"><label>Curve</label>
+              <select id="seriesCurve">
+                <option value="smooth">Smooth</option>
+                <option value="straight">Straight</option>
+              </select>
+            </div>
+          </div>
+          <button class="danger-outline" id="removeSeriesBtn" style="display:none;">Remove this series</button>
+
+          <div class="field" style="margin-top:4px;">
+            <label>Points</label>
+            <div class="pts-wrap"><table class="pts" id="ptsTable"></table></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="cp-section">
+        <summary>Legend</summary>
+        <div class="cp-body">
+          <label class="check"><input type="checkbox" id="legendToggle" checked> Show legend</label>
+          <div class="field"><label>Position</label>
+            <select id="legendPos">
+              <option value="tr">Top right</option>
+              <option value="tl">Top left</option>
+              <option value="br" selected>Bottom right</option>
+              <option value="bl">Bottom left</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+    </aside>
+  </div>
+
+  <div class="modal-overlay" id="howtoOverlay">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="howtoTitle">
+      <div class="modal-head">
+        <h2 id="howtoTitle">How to use Plotcraft</h2>
+        <button class="ghost icon-only" id="howtoClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-step">
+          <span class="step-no">1</span>
+          <div><strong>Pick a series.</strong> Click a chip in the toolbar above the chart to make it active — that's the one you're drawing.</div>
+        </div>
+        <div class="modal-step">
+          <span class="step-no">2</span>
+          <div><strong>Click the sheet to add points.</strong> Each click drops a point on the active series. Only the active series can be edited on the chart — others stay locked so you don't bump them by accident.</div>
+        </div>
+        <div class="modal-step">
+          <span class="step-no">3</span>
+          <div><strong>Drag a point to move it, double-click to delete it.</strong> Or edit the exact x/y numbers in the points table on the right, under "Active series".</div>
+        </div>
+        <div class="modal-step">
+          <span class="step-no">4</span>
+          <div><strong>Made a mistake?</strong> Hit the ↶ undo button — it steps back through adds, drags, edits and deletes, one at a time.</div>
+        </div>
+        <div class="modal-step">
+          <span class="step-no">5</span>
+          <div><strong>Add more series</strong> with "+ Add series". Each one gets its own color and marker shape automatically. Remove one with the × on its chip.</div>
+        </div>
+        <div class="modal-step">
+          <span class="step-no">6</span>
+          <div><strong>Style it on the right.</strong> Set the title, axis names, axis min/max/tick spacing, font sizes, and legend position in the panels on the right. Open "Active series" to change a series' color, marker, line style, or curve.</div>
+        </div>
+        <div class="modal-step">
+          <span class="step-no">7</span>
+          <div><strong>Download</strong> your figure as SVG (for papers), PNG (for slides/docs), or CSV (your raw points) from the Download button above the chart.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PALETTE = ['#3B7DC4','#D1574F','#3FA34D','#8B5CB8','#E0972D','#2AA8A0','#C4589E','#6B7280'];
+  const MARKER_CYCLE = ['circle','square','triangle','diamond','triangle-down','star','cross','plus'];
+  let seriesCycle = 0;
+
+  function newSeries(name){
+    const c = PALETTE[seriesCycle % PALETTE.length];
+    const mk = MARKER_CYCLE[seriesCycle % MARKER_CYCLE.length];
+    seriesCycle++;
+    return { id:'s'+Math.random().toString(36).slice(2,9), name:name, color:c,
+      marker:mk, lineStyle:'solid', curve:'smooth', points:[] };
+  }
+
+  const state = {
+    title:'', xLabel:'X axis', yLabel:'Y axis',
+    xMin:0, xMax:30, xStep:5, yMin:0, yMax:1, yStep:0.2,
+    showGrid:true, fontFamily:'serif',
+    titleSize:24, axisLabelSize:19, tickLabelSize:15, legendSize:16,
+    showLegend:true, legendPos:'br',
+    series:[ newSeries('Series 1') ],
+    activeId:null
+  };
+  state.activeId = state.series[0].id;
+
+  function activeSeries(){ return state.series.find(s=>s.id===state.activeId); }
+
+  const fontStacks = {
+    serif:"Georgia,'Times New Roman',serif",
+    sans:"Helvetica,Arial,sans-serif",
+    mono:"'IBM Plex Mono',monospace"
+  };
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('plot');
+  const readout = document.getElementById('readout');
+
+  let plotRect = null;
+
+  function el(tag, attrs, children){
+    const e = document.createElementNS(svgNS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    if(children) children.forEach(c=>e.appendChild(c));
+    return e;
+  }
+  function textEl(x,y,str,attrs){
+    const t = el('text', Object.assign({x:x,y:y}, attrs));
+    t.textContent = str;
+    return t;
+  }
+
+  function niceTicks(min,max,step){
+    const out = [];
+    if(!(step>0) || !(max>min)) return out;
+    const n = (max-min)/step;
+    if(n>400) step = (max-min)/50;
+    let v = min;
+    let guard=0;
+    while(v <= max + step*1e-6 && guard<600){
+      out.push(Math.abs(v)<1e-9?0:v);
+      v += step; guard++;
+    }
+    return out;
+  }
+  function fmtNum(v){
+    const r = Math.round(v*1e6)/1e6;
+    return (Math.abs(r) < 1e-9) ? '0' : (Number.isInteger(r) ? String(r) : String(parseFloat(r.toFixed(6))));
+  }
+
+  function measureTickWidth(min,max,step,fontSize){
+    const ticks = niceTicks(min,max,step);
+    let maxLen = 1;
+    ticks.forEach(t=>{ maxLen = Math.max(maxLen, fmtNum(t).length); });
+    return maxLen * fontSize * 0.62;
+  }
+
+  function render(){
+    svg.innerHTML = '';
+    const W = 900, H = 560;
+    const font = fontStacks[state.fontFamily];
+
+    const topMargin = state.title ? state.titleSize + 34 : 26;
+    const yTickW = measureTickWidth(state.yMin,state.yMax,state.yStep,state.tickLabelSize);
+    const leftMargin = yTickW + state.axisLabelSize*0.6 + 34;
+    const bottomMargin = state.tickLabelSize + state.axisLabelSize*0.75 + 24;
+    const rightMargin = 28;
+
+    const plotLeft = leftMargin, plotTop = topMargin;
+    const plotW = W - leftMargin - rightMargin;
+    const plotH = H - topMargin - bottomMargin;
+    plotRect = {left:plotLeft, top:plotTop, width:plotW, height:plotH,
+      xMin:state.xMin, xMax:state.xMax, yMin:state.yMin, yMax:state.yMax};
+
+    function X(x){ return plotLeft + (x-state.xMin)/(state.xMax-state.xMin)*plotW; }
+    function Y(y){ return plotTop + (1-(y-state.yMin)/(state.yMax-state.yMin))*plotH; }
+
+    // background sheet
+    svg.appendChild(el('rect',{x:0,y:0,width:W,height:H,fill:'#ffffff'}));
+
+    // gridlines
+    if(state.showGrid){
+      const g = el('g',{});
+      niceTicks(state.xMin,state.xMax,state.xStep).forEach(t=>{
+        const px = X(t);
+        g.appendChild(el('line',{x1:px,y1:plotTop,x2:px,y2:plotTop+plotH,stroke:'#BFBFBF','stroke-width':0.8,'stroke-dasharray':'2,2'}));
+      });
+      niceTicks(state.yMin,state.yMax,state.yStep).forEach(t=>{
+        const py = Y(t);
+        g.appendChild(el('line',{x1:plotLeft,y1:py,x2:plotLeft+plotW,y2:py,stroke:'#BFBFBF','stroke-width':0.8,'stroke-dasharray':'2,2'}));
+      });
+      svg.appendChild(g);
+    }
+
+    // border box
+    svg.appendChild(el('rect',{x:plotLeft,y:plotTop,width:plotW,height:plotH,fill:'none',stroke:'#000000','stroke-width':1.6}));
+
+    // ticks + labels
+    const tickG = el('g',{});
+    niceTicks(state.xMin,state.xMax,state.xStep).forEach(t=>{
+      const px = X(t);
+      tickG.appendChild(el('line',{x1:px,y1:plotTop+plotH,x2:px,y2:plotTop+plotH+5,stroke:'#000000','stroke-width':1.3}));
+      tickG.appendChild(el('line',{x1:px,y1:plotTop,x2:px,y2:plotTop+5,stroke:'#000000','stroke-width':1.3}));
+      tickG.appendChild(textEl(px, plotTop+plotH+7+state.tickLabelSize, fmtNum(t),
+        {'font-family':font,'font-size':state.tickLabelSize,fill:'#000000','text-anchor':'middle'}));
+    });
+    niceTicks(state.yMin,state.yMax,state.yStep).forEach(t=>{
+      const py = Y(t);
+      tickG.appendChild(el('line',{x1:plotLeft-5,y1:py,x2:plotLeft,y2:py,stroke:'#000000','stroke-width':1.3}));
+      tickG.appendChild(el('line',{x1:plotLeft+plotW-5,y1:py,x2:plotLeft+plotW,y2:py,stroke:'#000000','stroke-width':1.3}));
+      tickG.appendChild(textEl(plotLeft-9, py+state.tickLabelSize*0.32, fmtNum(t),
+        {'font-family':font,'font-size':state.tickLabelSize,fill:'#000000','text-anchor':'end'}));
+    });
+    svg.appendChild(tickG);
+
+    // axis labels
+    svg.appendChild(textEl(plotLeft+plotW/2, plotTop+plotH+state.tickLabelSize+state.axisLabelSize*0.75+14, state.xLabel,
+      {'font-family':font,'font-size':state.axisLabelSize,fill:'#000000','text-anchor':'middle','font-weight':'700'}));
+    const yLbl = textEl(0,0,state.yLabel,{'font-family':font,'font-size':state.axisLabelSize,fill:'#000000','text-anchor':'middle','font-weight':'700'});
+    yLbl.setAttribute('transform', `translate(${24}, ${plotTop+plotH/2}) rotate(-90)`);
+    svg.appendChild(yLbl);
+
+    // title
+    if(state.title){
+      svg.appendChild(textEl(plotLeft+plotW/2, topMargin-16, state.title,
+        {'font-family':font,'font-size':state.titleSize,fill:'#000000','text-anchor':'middle','font-weight':'700'}));
+    }
+
+    // click-capture background (must be before series so markers sit on top)
+    const capture = el('rect',{x:plotLeft,y:plotTop,width:plotW,height:plotH,fill:'transparent'});
+    capture.style.cursor='crosshair';
+    capture.addEventListener('click', onCaptureClick);
+    capture.addEventListener('mousemove', onCaptureMove);
+    svg.appendChild(capture);
+
+    // series lines + markers
+    state.series.forEach(s=>{
+      const pts = s.points.slice().sort((a,b)=>a.x-b.x);
+      const screenPts = pts.map(p=>({x:X(p.x), y:Y(p.y)}));
+      if(screenPts.length>1 && s.lineStyle!=='none'){
+        const d = s.curve==='smooth' ? smoothPath(screenPts) : straightPath(screenPts);
+        const path = el('path',{d:d, fill:'none', stroke:s.color, 'stroke-width':2.2});
+        if(s.lineStyle==='dashed') path.setAttribute('stroke-dasharray','7,5');
+        svg.appendChild(path);
+      }
+      if(s.marker!=='none'){
+        pts.forEach((p,idx)=>{
+          const cx=X(p.x), cy=Y(p.y);
+          const m = markerEl(s.marker, cx, cy, 5.2, s.color);
+          if(s.id===state.activeId){
+            m.style.cursor='pointer';
+            m.addEventListener('mousedown', (e)=>{ e.stopPropagation(); startDrag(s.id, s.points.indexOf(p)); });
+            m.addEventListener('dblclick', (e)=>{ e.stopPropagation(); deletePoint(s.id, s.points.indexOf(p)); });
+          } else {
+            m.style.pointerEvents='none';
+          }
+          svg.appendChild(m);
+        });
+      }
+    });
+
+    // legend
+    if(state.showLegend && state.series.some(s=>s.points.length||true)){
+      drawLegend(font);
+    }
+
+    renderChips();
+    renderSeriesForm();
+    renderPointsTable();
+
+    function drawLegend(font){
+      const entries = state.series;
+      const lh = state.legendSize + 10;
+      const boxW = 150 + state.legendSize*2;
+      const boxH = entries.length*lh + 14;
+      let bx, by;
+      const pad = 12;
+      if(state.legendPos==='tr'){ bx=plotLeft+plotW-boxW-pad; by=plotTop+pad; }
+      else if(state.legendPos==='tl'){ bx=plotLeft+pad; by=plotTop+pad; }
+      else if(state.legendPos==='bl'){ bx=plotLeft+pad; by=plotTop+plotH-boxH-pad; }
+      else { bx=plotLeft+plotW-boxW-pad; by=plotTop+plotH-boxH-pad; }
+
+      const g = el('g',{});
+      g.appendChild(el('rect',{x:bx,y:by,width:boxW,height:boxH,fill:'#ffffff',stroke:'#000000','stroke-width':1.2}));
+      entries.forEach((s,i)=>{
+        const cy = by+14+i*lh;
+        const lx1=bx+10, lx2=bx+38;
+        if(s.lineStyle!=='none'){
+          const lp = el('line',{x1:lx1,y1:cy,x2:lx2,y2:cy,stroke:s.color,'stroke-width':2.2});
+          if(s.lineStyle==='dashed') lp.setAttribute('stroke-dasharray','6,4');
+          g.appendChild(lp);
+        }
+        if(s.marker!=='none') g.appendChild(markerEl(s.marker,(lx1+lx2)/2,cy,4.4,s.color));
+        g.appendChild(textEl(lx2+10, cy+state.legendSize*0.32, s.name,
+          {'font-family':font,'font-size':state.legendSize,fill:'#000000'}));
+      });
+      svg.appendChild(g);
+    }
+  }
+
+  function markerEl(shape,cx,cy,r,color){
+    const sw=1.7;
+    if(shape==='circle') return el('circle',{cx:cx,cy:cy,r:r,fill:'#ffffff',stroke:color,'stroke-width':sw});
+    if(shape==='square') return el('rect',{x:cx-r,y:cy-r,width:r*2,height:r*2,fill:'#ffffff',stroke:color,'stroke-width':sw});
+    if(shape==='diamond') return el('rect',{x:cx-r,y:cy-r,width:r*2,height:r*2,fill:'#ffffff',stroke:color,'stroke-width':sw,transform:`rotate(45 ${cx} ${cy})`});
+    if(shape==='triangle'){
+      const h=r*1.8;
+      return el('polygon',{points:`${cx},${cy-h*0.62} ${cx-h*0.58},${cy+h*0.5} ${cx+h*0.58},${cy+h*0.5}`,fill:'#ffffff',stroke:color,'stroke-width':sw});
+    }
+    if(shape==='triangle-down'){
+      const h=r*1.8;
+      return el('polygon',{points:`${cx},${cy+h*0.62} ${cx-h*0.58},${cy-h*0.5} ${cx+h*0.58},${cy-h*0.5}`,fill:'#ffffff',stroke:color,'stroke-width':sw});
+    }
+    if(shape==='star'){
+      const outerR=r*1.55, innerR=r*0.6, pts=[];
+      for(let i=0;i<10;i++){
+        const ang = -Math.PI/2 + i*Math.PI/5;
+        const rr = i%2===0 ? outerR : innerR;
+        pts.push(`${cx+rr*Math.cos(ang)},${cy+rr*Math.sin(ang)}`);
+      }
+      return el('polygon',{points:pts.join(' '),fill:'#ffffff',stroke:color,'stroke-width':sw});
+    }
+    if(shape==='cross'){
+      const h=r*0.95;
+      return el('g',{},[
+        el('line',{x1:cx-h,y1:cy-h,x2:cx+h,y2:cy+h,stroke:color,'stroke-width':sw+0.5}),
+        el('line',{x1:cx-h,y1:cy+h,x2:cx+h,y2:cy-h,stroke:color,'stroke-width':sw+0.5})
+      ]);
+    }
+    if(shape==='plus'){
+      const h=r*1.15;
+      return el('g',{},[
+        el('line',{x1:cx-h,y1:cy,x2:cx+h,y2:cy,stroke:color,'stroke-width':sw+0.5}),
+        el('line',{x1:cx,y1:cy-h,x2:cx,y2:cy+h,stroke:color,'stroke-width':sw+0.5})
+      ]);
+    }
+    return el('circle',{cx:cx,cy:cy,r:r,fill:'#ffffff',stroke:color,'stroke-width':sw});
+  }
+
+  function straightPath(pts){
+    return 'M'+pts.map(p=>`${p.x},${p.y}`).join(' L');
+  }
+  function smoothPath(pts){
+    if(pts.length<2) return '';
+    if(pts.length===2) return `M${pts[0].x},${pts[0].y} L${pts[1].x},${pts[1].y}`;
+    let d = `M${pts[0].x},${pts[0].y} `;
+    for(let i=0;i<pts.length-1;i++){
+      const p0 = pts[i-1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i+1];
+      const p3 = pts[i+2] || p2;
+      const cp1x = p1.x + (p2.x-p0.x)/6, cp1y = p1.y + (p2.y-p0.y)/6;
+      const cp2x = p2.x - (p3.x-p1.x)/6, cp2y = p2.y - (p3.y-p1.y)/6;
+      d += `C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y} `;
+    }
+    return d;
+  }
+
+  function svgPointFromEvent(evt){
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX; pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM().inverse();
+    return pt.matrixTransform(ctm);
+  }
+  function pxToData(px,py){
+    const x = plotRect.xMin + (px-plotRect.left)/plotRect.width*(plotRect.xMax-plotRect.xMin);
+    const y = plotRect.yMin + (1-(py-plotRect.top)/plotRect.height)*(plotRect.yMax-plotRect.yMin);
+    return {x,y};
+  }
+  function clamp(v,lo,hi){ return Math.min(hi,Math.max(lo,v)); }
+
+  const history = [];
+  function pushHistory(seriesId){
+    const s = state.series.find(x=>x.id===seriesId);
+    if(!s) return;
+    history.push({seriesId, points: JSON.parse(JSON.stringify(s.points))});
+    if(history.length>80) history.shift();
+    updateUndoState();
+  }
+  function undo(){
+    while(history.length){
+      const last = history.pop();
+      const s = state.series.find(x=>x.id===last.seriesId);
+      if(s){
+        s.points = last.points;
+        state.activeId = s.id;
+        render();
+        break;
+      }
+    }
+    updateUndoState();
+  }
+  function updateUndoState(){
+    const btn = document.getElementById('undoBtn');
+    if(btn) btn.disabled = history.length===0;
+  }
+
+  function onCaptureClick(evt){
+    const p = svgPointFromEvent(evt);
+    const d = pxToData(p.x,p.y);
+    const s = activeSeries();
+    if(!s) return;
+    pushHistory(s.id);
+    s.points.push({x: clamp(d.x, state.xMin, state.xMax), y: clamp(d.y, state.yMin, state.yMax)});
+    render();
+  }
+  function onCaptureMove(evt){
+    const p = svgPointFromEvent(evt);
+    const d = pxToData(p.x,p.y);
+    readout.textContent = `x: ${fmtNum(clamp(d.x,state.xMin,state.xMax))}   y: ${fmtNum(clamp(d.y,state.yMin,state.yMax))}`;
+  }
+
+  let dragging = null;
+  function startDrag(seriesId, index){
+    pushHistory(seriesId);
+    dragging = {seriesId, index};
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+  }
+  function onDragMove(evt){
+    if(!dragging) return;
+    const p = svgPointFromEvent(evt);
+    const d = pxToData(p.x,p.y);
+    const s = state.series.find(x=>x.id===dragging.seriesId);
+    if(!s || !s.points[dragging.index]) return;
+    s.points[dragging.index].x = clamp(d.x, state.xMin, state.xMax);
+    s.points[dragging.index].y = clamp(d.y, state.yMin, state.yMax);
+    render();
+  }
+  function onDragEnd(){
+    dragging = null;
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+  }
+  function deletePoint(seriesId, index){
+    const s = state.series.find(x=>x.id===seriesId);
+    if(!s) return;
+    pushHistory(seriesId);
+    s.points.splice(index,1);
+    render();
+  }
+
+  function renderChips(){
+    const wrap = document.getElementById('chips');
+    wrap.innerHTML = '';
+    state.series.forEach(s=>{
+      const c = document.createElement('div');
+      c.className = 'chip'+(s.id===state.activeId?' active':'');
+      c.innerHTML = `<span class="dot" style="background:${s.color}"></span><span class="name">${escapeHtml(s.name)}</span><span class="chip-x" title="Remove series">&times;</span>`;
+      c.addEventListener('click', ()=>{ state.activeId = s.id; render(); });
+      c.querySelector('.chip-x').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        removeSeries(s.id);
+      });
+      wrap.appendChild(c);
+    });
+  }
+  function escapeHtml(str){
+    return str.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+  }
+
+  function renderSeriesForm(){
+    const s = activeSeries();
+    if(!s) return;
+    document.getElementById('seriesName').value = s.name;
+    document.getElementById('seriesColor').value = s.color;
+    document.getElementById('seriesMarker').value = s.marker;
+    document.getElementById('seriesLineStyle').value = s.lineStyle;
+    document.getElementById('seriesCurve').value = s.curve;
+    document.getElementById('removeSeriesBtn').disabled = state.series.length<=1;
+  }
+
+  function renderPointsTable(){
+    const s = activeSeries();
+    const table = document.getElementById('ptsTable');
+    table.innerHTML = '';
+    if(!s || s.points.length===0){
+      table.innerHTML = '<tr><td class="empty-note" colspan="3">No points yet — click the sheet to add one.</td></tr>';
+      return;
+    }
+    const sorted = s.points.map((p,i)=>({p,i})).sort((a,b)=>a.p.x-b.p.x);
+    const head = document.createElement('tr');
+    head.innerHTML = '<th>X</th><th>Y</th><th></th>';
+    table.appendChild(head);
+    sorted.forEach(({p,i})=>{
+      const tr = document.createElement('tr');
+      const tdX = document.createElement('td');
+      const inX = document.createElement('input'); inX.type='number'; inX.step='any'; inX.value=fmtNum(p.x);
+      inX.addEventListener('change', ()=>{ pushHistory(s.id); p.x = clamp(parseFloat(inX.value)||0, state.xMin, state.xMax); render(); });
+      tdX.appendChild(inX);
+      const tdY = document.createElement('td');
+      const inY = document.createElement('input'); inY.type='number'; inY.step='any'; inY.value=fmtNum(p.y);
+      inY.addEventListener('change', ()=>{ pushHistory(s.id); p.y = clamp(parseFloat(inY.value)||0, state.yMin, state.yMax); render(); });
+      tdY.appendChild(inY);
+      const tdDel = document.createElement('td');
+      const delBtn = document.createElement('button'); delBtn.className='del-pt'; delBtn.textContent='×';
+      delBtn.addEventListener('click', ()=>{ deletePoint(s.id, i); });
+      tdDel.appendChild(delBtn);
+      tr.appendChild(tdX); tr.appendChild(tdY); tr.appendChild(tdDel);
+      table.appendChild(tr);
+    });
+  }
+
+  // ---- wiring ----
+  function bindNum(id, key){
+    document.getElementById(id).addEventListener('input', e=>{
+      const v = parseFloat(e.target.value);
+      if(!isNaN(v)){ state[key]=v; render(); }
+    });
+  }
+  bindNum('xMin','xMin'); bindNum('xMax','xMax'); bindNum('xStep','xStep');
+  bindNum('yMin','yMin'); bindNum('yMax','yMax'); bindNum('yStep','yStep');
+
+  document.getElementById('titleInput').addEventListener('input', e=>{ state.title=e.target.value; render(); });
+  document.getElementById('xLabelInput').addEventListener('input', e=>{ state.xLabel=e.target.value; render(); });
+  document.getElementById('yLabelInput').addEventListener('input', e=>{ state.yLabel=e.target.value; render(); });
+  document.getElementById('gridToggle').addEventListener('change', e=>{ state.showGrid=e.target.checked; render(); });
+  document.getElementById('fontFamily').addEventListener('change', e=>{ state.fontFamily=e.target.value; render(); });
+
+  function bindSizeSlider(id,outId,key){
+    const inp = document.getElementById(id), out = document.getElementById(outId);
+    inp.addEventListener('input', e=>{ state[key]=parseFloat(e.target.value); out.textContent=e.target.value; render(); });
+  }
+  bindSizeSlider('titleSize','titleSizeOut','titleSize');
+  bindSizeSlider('axisLabelSize','axisLabelSizeOut','axisLabelSize');
+  bindSizeSlider('tickLabelSize','tickLabelSizeOut','tickLabelSize');
+  bindSizeSlider('legendSize','legendSizeOut','legendSize');
+
+  document.getElementById('legendToggle').addEventListener('change', e=>{ state.showLegend=e.target.checked; render(); });
+  document.getElementById('legendPos').addEventListener('change', e=>{ state.legendPos=e.target.value; render(); });
+
+  document.getElementById('seriesName').addEventListener('input', e=>{ activeSeries().name=e.target.value; render(); });
+  document.getElementById('seriesColor').addEventListener('input', e=>{ activeSeries().color=e.target.value; render(); });
+  document.getElementById('seriesMarker').addEventListener('change', e=>{ activeSeries().marker=e.target.value; render(); });
+  document.getElementById('seriesLineStyle').addEventListener('change', e=>{ activeSeries().lineStyle=e.target.value; render(); });
+  document.getElementById('seriesCurve').addEventListener('change', e=>{ activeSeries().curve=e.target.value; render(); });
+
+  document.getElementById('addSeriesBtn').addEventListener('click', ()=>{
+    const s = newSeries('Series '+(state.series.length+1));
+    state.series.push(s); state.activeId = s.id; render();
+  });
+  document.getElementById('removeSeriesBtn').addEventListener('click', ()=>{
+    removeSeries(state.activeId);
+  });
+  function removeSeries(id){
+    if(state.series.length<=1) return;
+    const idx = state.series.findIndex(s=>s.id===id);
+    if(idx===-1) return;
+    state.series.splice(idx,1);
+    if(state.activeId===id){
+      state.activeId = state.series[Math.max(0,idx-1)].id;
+    }
+    render();
+  }
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('clearBtn').addEventListener('click', ()=>{
+    const s = activeSeries(); if(s){ pushHistory(s.id); s.points = []; render(); }
+  });
+
+  function filenameBase(){
+    const base = (state.title || 'plot').trim().replace(/[^a-z0-9\-_ ]/gi,'').replace(/\s+/g,'_');
+    return base || 'plot';
+  }
+
+  function getSvgString(){
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    clone.setAttribute('width','900');
+    clone.setAttribute('height','560');
+    return new XMLSerializer().serializeToString(clone);
+  }
+
+  function triggerDownload(filename, href, isObjectUrl){
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    if(isObjectUrl) setTimeout(()=>URL.revokeObjectURL(href), 2000);
+  }
+
+  function downloadSVG(){
+    const xml = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + getSvgString();
+    const blob = new Blob([xml], {type:'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    triggerDownload(filenameBase()+'.svg', url, true);
+  }
+
+  function downloadPNG(){
+    const xml = getSvgString();
+    const svg64 = btoa(unescape(encodeURIComponent(xml)));
+    const image64 = 'data:image/svg+xml;base64,'+svg64;
+    const img = new Image();
+    img.onload = function(){
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = 900*scale; canvas.height = 560*scale;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.scale(scale,scale);
+      ctx.drawImage(img,0,0,900,560);
+      canvas.toBlob(function(blob){
+        const url = URL.createObjectURL(blob);
+        triggerDownload(filenameBase()+'.png', url, true);
+      }, 'image/png');
+    };
+    img.onerror = function(){
+      alert('Could not render PNG. Try downloading the SVG instead.');
+    };
+    img.src = image64;
+  }
+
+  function csvEscape(str){
+    str = String(str);
+    return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str;
+  }
+
+  function downloadCSV(){
+    const lines = ['series,x,y'];
+    state.series.forEach(s=>{
+      s.points.slice().sort((a,b)=>a.x-b.x).forEach(p=>{
+        lines.push(`${csvEscape(s.name)},${fmtNum(p.x)},${fmtNum(p.y)}`);
+      });
+    });
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    triggerDownload(filenameBase()+'.csv', url, true);
+  }
+
+  const dlDropdown = document.getElementById('dlDropdown');
+  const dlMenu = document.getElementById('dlMenu');
+  document.getElementById('downloadBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    dlMenu.classList.toggle('open');
+  });
+  dlMenu.querySelectorAll('button[data-fmt]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const fmt = btn.getAttribute('data-fmt');
+      dlMenu.classList.remove('open');
+      if(fmt==='svg') downloadSVG();
+      else if(fmt==='png') downloadPNG();
+      else if(fmt==='csv') downloadCSV();
+    });
+  });
+  document.addEventListener('click', (e)=>{
+    if(!dlDropdown.contains(e.target)) dlMenu.classList.remove('open');
+  });
+
+  const howtoOverlay = document.getElementById('howtoOverlay');
+  document.getElementById('howtoBtn').addEventListener('click', ()=>{
+    howtoOverlay.classList.add('open');
+  });
+  document.getElementById('howtoClose').addEventListener('click', ()=>{
+    howtoOverlay.classList.remove('open');
+  });
+  howtoOverlay.addEventListener('click', (e)=>{
+    if(e.target === howtoOverlay) howtoOverlay.classList.remove('open');
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape') howtoOverlay.classList.remove('open');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
